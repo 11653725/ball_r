@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <title>ball_r</title>
+  <style>
+    :root {
+      --accent: #ff4444;
+      --bg-dark: #111;
+      --panel: #111;
+      --text: #e5e5e5;
+      --muted: #999999;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: "Consolas", "Courier New", monospace;
+      image-rendering: pixelated;
+    }
+
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #020202;
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 1000px;
+    }
+
+    /*
+    h1 {
+      margin: 0 0 8px;
+      font-size: 18px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      text-shadow: none;
+      text-align: center;
+    }
+    */
+
+    /* CRT SCREEN BOX – RAW STYLE */
+    .screen-wrapper {
+      background: #000;
+      padding: 4px;
+      border: 2px solid #333;
+      border-radius: 0;
+      box-shadow: none;
+      position: relative;
+      overflow: hidden;
+    }
+
+    canvas {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 0;
+      background: #000;
+      image-rendering: pixelated;
+    }
+
+    /* RETRO SCANLINES */
+    .scanlines {
+      pointer-events: none;
+      position: absolute;
+      inset: 4px;
+      background-image: linear-gradient(
+        rgba(0, 0, 0, 0.25) 50%,
+        transparent 50%
+      );
+      background-size: 100% 3px;
+      opacity: 0.5;
+      mix-blend-mode: multiply;
+    }
+
+    /* RETRO PANEL */
+    .bottom-panel {
+      background: #0a0a0a;
+      border-top: 2px solid #222;
+      border-radius: 0;
+      padding: 10px;
+      font-size: 13px;
+      display: grid;
+      grid-template-columns: 2fr 1.3fr 0.9fr;
+      gap: 10px;
+    }
+
+    .section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .control-row {
+      margin-bottom: 8px;
+    }
+
+    .control-row label {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 3px;
+    }
+
+    .control-row span.value {
+      color: var(--accent);
+      margin-left: 8px;
+      min-width: 55px;
+      text-align: right;
+    }
+
+    /* RETRO SLIDER */
+    input[type="range"] {
+      width: 100%;
+      appearance: none;
+      height: 6px;
+      background: #191919;
+      border: 1px solid #333;
+      border-radius: 0;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      background: url("slide_knob.png") center/contain no-repeat;
+      cursor: pointer;
+      border: none;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      background: url("slide_knob.png") center/contain no-repeat;
+      border: none;
+      cursor: pointer;
+    }
+
+    /* RESULTS RAW BOX */
+    .results {
+      background: #0b0b0b;
+      border: 2px solid #333;
+      border-radius: 0;
+      padding: 6px 8px;
+      font-size: 12px;
+    }
+
+    .results-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 3px;
+    }
+
+    .results-row span.value {
+      color: #ffe39a;
+    }
+
+    /* RETRO BUTTON */
+    button {
+      width: 100%;
+      padding: 6px 8px;
+      border: 2px solid #555;
+      background: #0a0a0a;
+      color: var(--text);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    button:hover {
+      background: #0f0f0f;
+      border-color: #666;
+    }
+
+    @media (max-width: 850px) {
+      .bottom-panel {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1></h1>
+
+    <div class="screen-wrapper">
+      <canvas id="simCanvas" width="800" height="450"></canvas>
+
+      <div class="bottom-panel">
+        
+        <!-- INPUTS -->
+        <div>
+          <div class="section-title">Vstupy</div>
+
+          <div class="control-row">
+            <label>
+              Rychlost v₀ [m/s]
+              <span class="value" id="speedValue"></span>
+            </label>
+            <input type="range" id="speed" min="5" max="60" step="1" value="25"/>
+          </div>
+
+          <div class="control-row">
+            <label>
+              Úhel α [°]
+              <span class="value" id="angleValue"></span>
+            </label>
+            <input type="range" id="angle" min="5" max="85" step="1" value="45"/>
+          </div>
+
+          <div class="control-row">
+            <label>
+              Počáteční výška h₀ [m]
+              <span class="value" id="heightValue"></span>
+            </label>
+            <input type="range" id="height" min="0" max="20" step="0.5" value="0"/>
+          </div>
+        </div>
+
+        <!-- RESULTS -->
+        <div>
+          <div class="section-title">Výsledky</div>
+          <div class="results">
+            <div class="results-row">
+              <span>Max. výška:</span><span class="value" id="maxHeightOut">–</span>
+            </div>
+            <div class="results-row">
+              <span>Dolet:</span><span class="value" id="rangeOut">–</span>
+            </div>
+            <div class="results-row">
+              <span>Čas letu:</span><span class="value" id="timeOut">–</span>
+            </div>
+            <div class="results-row">
+              <span>Ideální úhel:</span><span class="value" id="optAngleOut">–</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- START BUTTON -->
+        <div>
+          <button id="launchBtn">Spustit</button>
+        </div>
+
+      </div>
+
+      <div class="scanlines"></div>
+    </div>
+  </div>
+
+<script>
+const g = 9.81;
+
+const canvas = document.getElementById("simCanvas");
+const ctx = canvas.getContext("2d");
+
+const speedSlider = document.getElementById("speed");
+const angleSlider = document.getElementById("angle");
+const heightSlider = document.getElementById("height");
+
+const speedValue = document.getElementById("speedValue");
+const angleValue = document.getElementById("angleValue");
+const heightValue = document.getElementById("heightValue");
+
+const maxHeightOut = document.getElementById("maxHeightOut");
+const rangeOut = document.getElementById("rangeOut");
+const timeOut = document.getElementById("timeOut");
+const optAngleOut = document.getElementById("optAngleOut");
+
+const launchBtn = document.getElementById("launchBtn");
+
+const bgImg = new Image();
+bgImg.src = "Background.png";
+
+const ballImg = new Image();
+ballImg.src = "ball.png";
+
+const personImg = new Image();
+personImg.src = "person_silhouette.png";
+
+let loaded = 0;
+[bgImg, ballImg, personImg].forEach(img => img.onload = () => {
+  loaded++;
+  if (loaded === 3) simulateAndDraw();
+});
+
+function updateLabels() {
+  speedValue.textContent = speedSlider.value + " m/s";
+  angleValue.textContent = angleSlider.value + "°";
+  heightValue.textContent = heightSlider.value + " m";
+}
+
+function toRad(a){ return a*Math.PI/180; }
+
+function computeTrajectory(v0, angleDeg, h0) {
+  const a = toRad(angleDeg);
+  const v0x = v0 * Math.cos(a);
+  const v0y = v0 * Math.sin(a);
+
+  const tFlight = (v0y + Math.sqrt(v0y*v0y + 2*g*h0)) / g;
+  const tPeak = v0y / g;
+
+  return {
+    v0x,
+    v0y,
+    angleRad: a,
+    tFlight,
+    hMax: h0 + v0y*tPeak - 0.5*g*tPeak*tPeak,
+    range: v0x * tFlight
+  };
+}
+
+function computeOptimalAngle(v0, h0){
+  let bestA=0, bestR=0;
+  for(let a=1; a<89; a+=0.1){
+    const r=computeTrajectory(v0,a,h0).range;
+    if(r>bestR){ bestR=r; bestA=a; }
+  }
+  return {angle:bestA,range:bestR};
+}
+
+let animId=null;
+
+function simulateAndDraw(){
+  if(animId!==null){ cancelAnimationFrame(animId); animId=null; }
+
+  const v0 = parseFloat(speedSlider.value);
+  const ang = parseFloat(angleSlider.value);
+  const h0 = parseFloat(heightSlider.value);
+
+  const traj = computeTrajectory(v0,ang,h0);
+  const opt  = computeOptimalAngle(v0,h0);
+
+  maxHeightOut.textContent = traj.hMax.toFixed(2)+" m";
+  rangeOut.textContent     = traj.range.toFixed(2)+" m";
+  timeOut.textContent      = traj.tFlight.toFixed(2)+" s";
+  optAngleOut.textContent  = opt.angle.toFixed(1)+"°";
+
+  updateLabels();
+
+  const margin = 50;
+  const groundY = canvas.height - margin;
+
+  const maxX = Math.max(traj.range,1);
+  const maxY = Math.max(traj.hMax,h0,1);
+
+  const xScale = (canvas.width - margin*2)/(maxX*1.05);
+  const yScale = (canvas.height - margin*2)/(maxY*1.2);
+
+  const personHeightMeters = 1.8;
+  const ballDiameterMeters = 0.30;
+
+  const basePersonHeightPx = personHeightMeters*yScale;
+  const baseBallSizePx     = ballDiameterMeters*yScale;
+
+  const personH = Math.max(14,basePersonHeightPx);
+  const personW = personH*(personImg.width/personImg.height);
+  const ballSize = Math.max(4,baseBallSizePx);
+
+  const startX = margin;
+  const personX = startX - personW - 10;
+  const personY = groundY - personH;
+
+  let t=0;
+  const T=traj.tFlight;
+
+  function draw(){
+    const dt=T/260;
+    t+=dt;
+    if(t>T) t=T;
+
+    const x=traj.v0x*t;
+    const y=h0 + traj.v0y*t - 0.5*g*t*t;
+
+    const bx=margin + x*xScale;
+    const by=groundY - y*yScale;
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.imageSmoothingEnabled=false;
+
+    ctx.drawImage(bgImg,0,0,canvas.width,canvas.height);
+
+    ctx.fillStyle="#1f260e";
+    ctx.fillRect(0,groundY,canvas.width,canvas.height-groundY);
+
+    ctx.strokeStyle="#3c4420";
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(0,groundY);
+    ctx.lineTo(canvas.width,groundY);
+    ctx.stroke();
+
+    ctx.drawImage(personImg, personX, personY, personW, personH);
+
+    ctx.strokeStyle="#e6c077";
+    ctx.setLineDash([5,5]);
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    let steps=120;
+    for(let i=0;i<=steps;i++){
+      const tt=T*(i/steps);
+      const xx=traj.v0x*tt;
+      const yy=h0+traj.v0y*tt-0.5*g*tt*tt;
+      if(yy<0) break;
+      const sx=margin+xx*xScale;
+      const sy=groundY-yy*yScale;
+      if(i===0) ctx.moveTo(sx,sy);
+      else ctx.lineTo(sx,sy);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.drawImage(ballImg, bx-ballSize/2, by-ballSize/2, ballSize, ballSize);
+
+    ctx.fillStyle="#ffffff";
+    ctx.font="12px Consolas";
+    ctx.textAlign="center";
+    ctx.fillText(ang+"°", bx, by+ballSize*1.1);
+
+    if(t<T) animId=requestAnimationFrame(draw);
+  }
+
+  draw();
+}
+
+speedSlider.addEventListener("input", updateLabels);
+angleSlider.addEventListener("input", updateLabels);
+heightSlider.addEventListener("input", updateLabels);
+
+launchBtn.addEventListener("click", simulateAndDraw);
+
+</script>
+</body>
+</html>
